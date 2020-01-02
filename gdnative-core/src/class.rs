@@ -356,6 +356,7 @@ macro_rules! godot_class_build_export_methods {
                 $classty,
                 fn $name(&mut self, $owner_name: $owner_ty $(,$pname : $pty)* ) -> $retty
             ),
+            init::RpcMode::Disabled
         );
         godot_class_build_export_methods!($classty, $builder, $($tt)*);
     );

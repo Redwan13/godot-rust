@@ -5,6 +5,7 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
+use crate::method_macro::RpcModeWrapper;
 use proc_macro::TokenStream;
 
 mod derive_conv_variant;
@@ -22,16 +23,20 @@ pub fn methods(meta: TokenStream, input: TokenStream) -> TokenStream {
             .methods
             .into_iter()
             .map(|m| {
-                let name = m.ident.clone().to_string();
+                let sig = &m.signature;
+                let rpc_mode = RpcModeWrapper {
+                    rpc_mode: m.rpc_mode,
+                };
+                let name = sig.ident.clone().to_string();
 
                 quote!(
                     {
                         let method = gdnative::godot_wrap_method!(
                             #class_name,
-                            #m
+                            #sig
                         );
 
-                        builder.add_method(#name, method);
+                        builder.add_method(#name, method, #rpc_mode);
                     }
                 )
             })
@@ -59,7 +64,7 @@ pub fn methods(meta: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(
     NativeClass,
-    attributes(inherit, export, user_data, property, register_with)
+    attributes(inherit, export, rpc, user_data, property, register_with)
 )]
 pub fn derive_native_class(input: TokenStream) -> TokenStream {
     let data = derive_macro::parse_derive_input(input.clone());

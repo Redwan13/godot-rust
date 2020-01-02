@@ -10,6 +10,7 @@ members = [
     "test",
     "bindings_generator",
     "examples/hello_world",
+    "examples/multiplayer",
     "examples/spinning_cube",
     "examples/scene_create",
     "examples/signals"

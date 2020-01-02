@@ -35,6 +35,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::Range;
 use std::ptr;
+use std::str::FromStr;
 
 /// A handle that can register new classes to the engine during initialization.
 ///
@@ -214,12 +215,48 @@ pub type ScriptConstructorFn =
 pub type ScriptDestructorFn =
     unsafe extern "C" fn(*mut sys::godot_object, *mut libc::c_void, *mut libc::c_void) -> ();
 
+/// synced RPC_MODE enum from https://docs.godotengine.org/en/latest/classes/class_multiplayerapi.html
 pub enum RpcMode {
     Disabled,
     Remote,
-    Sync,
-    Mater,
-    Slave,
+    Master,
+    Puppet,
+    RemoteSync,
+    MasterSync,
+    PuppetSync,
+}
+
+impl FromStr for RpcMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let val = match s {
+            "Disabled" => RpcMode::Disabled,
+            "Remote" => RpcMode::Remote,
+            "Master" => RpcMode::Master,
+            "Puppet" => RpcMode::Puppet,
+            "RemoteSync" => RpcMode::RemoteSync,
+            "MasterSync" => RpcMode::MasterSync,
+            "PuppetSync" => RpcMode::PuppetSync,
+            _ => panic!("Invalid RpcMode representation"),
+        };
+        Ok(val)
+    }
+}
+
+impl ToString for RpcMode {
+    fn to_string(&self) -> String {
+        let val = match self {
+            RpcMode::Disabled => "Disabled",
+            RpcMode::Remote => "Remote",
+            RpcMode::Master => "Master",
+            RpcMode::Puppet => "Puppet",
+            RpcMode::RemoteSync => "RemoteSync",
+            RpcMode::MasterSync => "MasterSync",
+            RpcMode::PuppetSync => "PuppetSync",
+        };
+        return String::from(val);
+    }
 }
 
 pub struct ScriptMethodAttributes {
@@ -253,7 +290,15 @@ impl<C: NativeClass> ClassBuilder<C> {
     pub fn add_method_advanced(&self, method: ScriptMethod) {
         let method_name = CString::new(method.name).unwrap();
         let attr = sys::godot_method_attributes {
-            rpc_type: sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_DISABLED,
+            rpc_type: match method.attributes.rpc_mode {
+                RpcMode::Disabled => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_DISABLED,
+                RpcMode::Remote => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_REMOTE,
+                RpcMode::Master => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_MASTER,
+                RpcMode::Puppet => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_PUPPET,
+                RpcMode::RemoteSync => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_REMOTESYNC,
+                RpcMode::MasterSync => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_MASTERSYNC,
+                RpcMode::PuppetSync => sys::godot_method_rpc_mode_GODOT_METHOD_RPC_MODE_PUPPETSYNC,
+            },
         };
 
         let method_desc = sys::godot_instance_method {
@@ -273,13 +318,12 @@ impl<C: NativeClass> ClassBuilder<C> {
         }
     }
 
-    pub fn add_method(&self, name: &str, method: ScriptMethodFn) {
+    pub fn add_method(&self, name: &str, method: ScriptMethodFn, rpc_mode: RpcMode) {
+        println!("added method {}; remote: {}", name, rpc_mode.to_string());
         self.add_method_advanced(ScriptMethod {
             name: name,
             method_ptr: Some(method),
-            attributes: ScriptMethodAttributes {
-                rpc_mode: RpcMode::Disabled,
-            },
+            attributes: ScriptMethodAttributes { rpc_mode: rpc_mode },
             method_data: ptr::null_mut(),
             free_func: None,
         });
